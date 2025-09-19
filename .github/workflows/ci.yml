@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dynamic-pricing
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build Docker image
+      run: docker build -t interview-app .
+    - name: Run the container
+      run: docker run -d -p 3000:3000 -v $(pwd):/rails --name interview-dev interview-app
+    - name: Run all tests
+      run: docker container exec interview-dev ./bin/rails test
+    - name: Test API endpoint returns 200
+      run: |
+        echo "Testing API endpoint..."
+        for i in {1..10}; do
+          echo "Attempt $i/10: Testing pricing endpoint..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" 'http://localhost:3000/pricing?period=Summer&hotel=FloatingPointResort&room=SingletonRoom' || echo "000")
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ API endpoint returned HTTP 200"
+            exit 0
+          else
+            echo "❌ API endpoint returned HTTP $HTTP_STATUS, retrying in 3 seconds..."
+            sleep 3
+          fi
+        done
+        echo "❌ API endpoint failed after 10 attempts"
+        exit 1
