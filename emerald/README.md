@@ -28,14 +28,6 @@ OPENAI_API_KEY=sk-... # required (OpenAI or gateway key. No, you can't have mine
 
 emerald loads env vars from the repo-root `.env`.
 
-## AI Proxy/Gateway (OpenRouter)
-
-Prefer routing through a gateway? Totally fine. Point `OPENAI_BASE_URL` to your provider and drop the provider key in `OPENAI_API_KEY`.
-
-- Example (OpenRouter):
-  - `OPENAI_BASE_URL=https://openrouter.ai/api/v1`
-  - `OPENAI_API_KEY=...your OpenRouter key...`
-
 ## What it scans and generates
 
 - Scans `./dynamic-pricing` recursively for Ruby files: `.rb`, `.rake`, `.gemspec`.
