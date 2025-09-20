@@ -190,9 +190,10 @@ Formatting & constraints:
 
 	try {
 		// Create OpenAI client with custom proxy configuration
+		const baseUrl = process.env.OPENAI_BASE_URL;
 		const openai = createOpenAI({
 			apiKey: process.env.OPENAI_API_KEY,
-			baseURL: process.env.OPENAI_BASE_URL,
+			baseURL: baseUrl ? baseUrl : undefined,
 		});
 
 		// Generate explanation using GPT-5 model
@@ -230,7 +231,7 @@ async function generateCommentedRuby(
 
 Always follow these rules:
 - Only use code inside the Code block delimited by \`\`\`ruby … \`\`\`. Ignore any content outside the delimiters.
-- Preserve exact runtime behavior, APIs, method names, and side effects. Do not refactor or reorder logic.
+- Preserve exact runtime behavior, APIs, method names, and side effects. DO NOT refactor or reorder logic.
 - Add both block comments (above definitions) and inline end-of-line comments to explain purpose, Ruby idioms, control flow, and Rails conventions.
 - Prefer concise, practical explanations and draw parallels to C#/TypeScript where useful.
 - Do not introduce external libraries or dependencies.

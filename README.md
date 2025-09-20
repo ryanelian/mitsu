@@ -14,7 +14,9 @@ This efficient service that acts as an intermediary to the dynamic pricing model
 
 2.  Ensure Rate Validity: A rate fetched from the pricing model is considered valid for 5 minutes. The service must ensure that any rate it provides for a given set of parameters (`period`, `hotel`, `room`) is no older than this 5-minute window.
 
-3.  Honor API Usage Limits: The model's API token is limited. The solution must be able to handle at least 10,000 requests per day from the users while using a single API token for the pricing model.
+3.  Respect External Model Capacity: The external `rate-api` can process at most 1,000 requests per day per API token. Do not exceed this cap; serve additional demand using caching and request coalescing. Reference: [tripladev/rate-api](https://hub.docker.com/r/tripladev/rate-api).
+
+4.  Scale the Proxy: The proxy must handle at least 10,000 requests per day and should scale horizontally (multiple instances behind a load balancer) to support millions of requests per day while maintaining the 5-minute rate validity constraint.
 
 ## Development Environment Setup
 
@@ -22,33 +24,79 @@ The project scaffold is a minimal Ruby on Rails application with a `/pricing` en
 
 The provided `Dockerfile` builds a container with all necessary dependencies. Your local code is mounted directly into the container, so any changes you make on your machine will be reflected immediately. Your application will need to communicate with the external pricing model, which also runs in its own Docker container.
 
-### Quick Start Guide
+## Quick Start Guide
 
-Here is a list of common commands for building, running, and interacting with the Dockerized environment.
+### 1) Build the Rails app image
+
+Use the helper script to build the Rails API image from `dynamic-pricing/`.
 
 ```bash
-
-# --- 1. Build & Run The Main Application ---
-# Build the Docker image
-docker build -t interview-app .
-
-# Run the service
-docker run -p 3000:3000 -v $(pwd):/rails interview-app
-
-# --- 2. Test The Endpoint ---
-# Send a sample request to your running service
-curl 'http://localhost:3000/pricing?period=Summer&hotel=FloatingPointResort&room=SingletonRoom'
-
-# --- 3. Run Tests ---
-# Run the development container in the background
-docker run -d -p 3000:3000 -v $(pwd):/rails --name interview-dev interview-app
-
-# Run the full test suite
-docker container exec -it interview-dev ./bin/rails test
-
-# Run a specific test file
-docker container exec -it interview-dev ./bin/rails test test/controllers/pricing_controller_test.rb
-
-# Run a specific test by name
-docker container exec -it interview-dev ./bin/rails test test/controllers/pricing_controller_test.rb -n test_should_get_pricing_with_all_parameters
+./build.sh
 ```
+
+This produces a local image named `dynamic-pricing-proxy`.
+
+### 2) Start the full dev stack
+
+Use docker-compose via the helper script. This:
+- mounts `dynamic-pricing/` into the Rails container for live reload
+- starts the Rails API, the external rate API, Valkey (Redis-compatible), and RedisInsight
+
+```bash
+./dev.sh
+```
+
+To view logs:
+```bash
+docker compose logs -f | cat
+```
+
+### 3) Test the pricing endpoint
+
+```bash
+curl 'http://localhost:3000/pricing?period=Summer&hotel=FloatingPointResort&room=SingletonRoom'
+```
+
+### 4) Run tests
+
+Use the helper script, which runs the full suite inside the running app container:
+```bash
+./test.sh
+```
+
+Run a specific test file:
+```bash
+docker exec -it dynamic-pricing-proxy ./bin/rails test test/controllers/pricing_controller_test.rb
+```
+
+Run a specific test by name:
+```bash
+docker exec -it dynamic-pricing-proxy ./bin/rails test test/controllers/pricing_controller_test.rb -n test_should_get_pricing_with_all_parameters
+```
+
+## Service Ports
+
+| Service         | Container Name           | Host Port | Container Port |
+|-----------------|--------------------------|-----------|----------------|
+| Rails API       | `dynamic-pricing-proxy`  | 3000      | 3000           |
+| Rate API        | `rate-api`               | 8080      | 8080           |
+| Valkey (Redis)  | `valkey`                 | 6379      | 6379           |
+| RedisInsight    | `redisinsight`           | 5540      | 5540           |
+
+## Teardown
+
+Stop and remove all services started by docker-compose:
+```bash
+./teardown.sh
+```
+
+If you need to remove containers, networks, and volumes forcefully:
+```bash
+docker compose down -v --remove-orphans
+```
+
+## Notes
+
+- The Rails container mounts `./dynamic-pricing:/rails`, so code changes are reflected immediately. (Hot Reload)
+- If you change service definitions, restart with `docker compose down && ./dev.sh`.
+- To stop all services: `docker compose down`.

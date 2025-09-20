@@ -2,16 +2,15 @@
 	"name": "emerald",
 	"version": "1.0.0",
 	"description": "CLI tool for generating AI-powered documentation for Ruby codebases",
-	"main": "emerald/index.js",
+	"main": "emerald/index.ts",
 	"type": "module",
 	"bin": {
-		"emerald": "./emerald/index.js"
+		"emerald": "./emerald/index.ts"
 	},
 	"scripts": {
 		"build": "tsc",
-		"dev": "tsx emerald/index.ts",
-		"scan": "pnpm tsx emerald/index.js",
-		"scan:comment": "pnpm tsx emerald/index.js --mode=comment",
+		"scan": "tsx emerald/index.ts",
+		"scan:comment": "tsx emerald/index.ts --mode=comment",
 		"check": "biome check",
 		"fix": "biome check --write"
 	},
