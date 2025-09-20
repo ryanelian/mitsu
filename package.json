@@ -1,0 +1,40 @@
+{
+	"name": "emerald",
+	"version": "1.0.0",
+	"description": "CLI tool for generating AI-powered documentation for Ruby codebases",
+	"main": "emerald/index.js",
+	"type": "module",
+	"bin": {
+		"emerald": "./emerald/index.js"
+	},
+	"scripts": {
+		"build": "tsc",
+		"dev": "tsx emerald/index.ts",
+		"scan": "pnpm tsx emerald/index.js",
+		"scan:comment": "pnpm tsx emerald/index.js --mode=comment",
+		"check": "biome check",
+		"fix": "biome check --write"
+	},
+	"keywords": [
+		"cli",
+		"documentation",
+		"ruby",
+		"ai",
+		"openai"
+	],
+	"author": "",
+	"license": "ISC",
+	"packageManager": "pnpm@10.17.0",
+	"devDependencies": {
+		"@biomejs/biome": "2.2.4",
+		"@types/node": "24.5.2",
+		"tsx": "4.20.5",
+		"typescript": "5.9.2"
+	},
+	"dependencies": {
+		"@ai-sdk/openai": "2.0.32",
+		"ai": "5.0.47",
+		"dotenv": "17.2.2",
+		"zod": "4.1.9"
+	}
+}
