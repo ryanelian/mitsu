@@ -95,6 +95,7 @@ GEM
     erb (5.0.2)
     erubi (1.13.1)
     ffi (1.17.2-aarch64-linux-musl)
+    ffi (1.17.2-arm64-darwin)
     globalid (1.2.1)
       activesupport (>= 6.1)
     i18n (1.14.7)
@@ -132,6 +133,8 @@ GEM
       net-protocol
     nio4r (2.7.4)
     nokogiri (1.18.9-aarch64-linux-musl)
+      racc (~> 1.4)
+    nokogiri (1.18.9-arm64-darwin)
       racc (~> 1.4)
     pp (0.6.2)
       prettyprint
@@ -186,10 +189,15 @@ GEM
     rdoc (6.14.2)
       erb
       psych (>= 4.0.0)
+    redis (5.4.1)
+      redis-client (>= 0.22.0)
+    redis-client (0.25.3)
+      connection_pool
     reline (0.6.2)
       io-console (~> 0.5)
     securerandom (0.4.1)
-    sqlite3 (2.7.3-aarch64-linux-musl)
+    sqlite3 (2.7.4-aarch64-linux-musl)
+    sqlite3 (2.7.4-arm64-darwin)
     stringio (3.1.7)
     thor (1.4.0)
     timeout (0.4.3)
@@ -203,6 +211,7 @@ GEM
 
 PLATFORMS
   aarch64-linux-musl
+  arm64-darwin-24
 
 DEPENDENCIES
   bootsnap
@@ -210,11 +219,12 @@ DEPENDENCIES
   listen (~> 3.3)
   puma (>= 5.0)
   rails (~> 7.1.5, >= 7.1.5.2)
+  redis (~> 5.4)
   sqlite3 (>= 1.4)
   tzinfo-data
 
 RUBY VERSION
-   ruby 3.2.6p234
+   ruby 3.4.6p54
 
 BUNDLED WITH
-   2.4.19
+   2.6.9
