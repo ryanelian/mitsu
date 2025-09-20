@@ -1,1 +1,1 @@
-docker exec -it dynamic-pricing-proxy ./bin/rails test
+docker exec dynamic-pricing-proxy ./bin/rails test
