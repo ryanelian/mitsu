@@ -1,6 +1,6 @@
 services:
   app:
-    image: interview-app
+    image: dynamic-pricing-proxy
     container_name: dynamic-pricing-proxy
     ports:
       - "3000:3000"
