@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:1
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version and Gemfile
-ARG RUBY_VERSION=3.2.6
+ARG RUBY_VERSION=3.4.6
 FROM ruby:$RUBY_VERSION-alpine
 
 # Rails app lives here
@@ -16,11 +16,12 @@ ENV RAILS_ENV="development" \
 RUN apk add --no-cache \
     build-base \
     git \
-    pkgconfig \
+    pkgconf \
     curl \
     sqlite-dev \
     sqlite \
-    tzdata
+    tzdata \
+    yaml-dev
 
 # Install application gems
 COPY Gemfile Gemfile.lock /rails/
