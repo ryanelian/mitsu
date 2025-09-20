@@ -9,17 +9,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./dynamic-pricing
     steps:
     - uses: actions/checkout@v4
     - name: Build Docker image
-      run: docker build -t interview-app .
+      run: ./build.sh
     - name: Run the container
-      run: docker run -d -p 3000:3000 -v $(pwd):/rails --name interview-dev interview-app
+      run: ./dev.sh
     - name: Run all tests
-      run: docker container exec interview-dev ./bin/rails test
+      run: ./test.sh
     - name: Test API endpoint returns 200
       run: |
         echo "Testing API endpoint..."
