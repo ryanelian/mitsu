@@ -22,7 +22,12 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_includes json_response["error"], "Missing required parameters"
+    assert_equal 400, json_response["status"]
+    assert_equal "One or more validation errors occurred.", json_response["title"]
+    assert json_response.key?("errors")
+    assert_equal ["The period field is required."], json_response["errors"]["period"]
+    assert_equal ["The hotel field is required."], json_response["errors"]["hotel"]
+    assert_equal ["The room field is required."], json_response["errors"]["room"]
   end
 
   test "should handle empty parameters" do
@@ -36,7 +41,11 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_includes json_response["error"], "Missing required parameters"
+    assert_equal 400, json_response["status"]
+    assert json_response.key?("errors")
+    assert_equal ["The period field is required."], json_response["errors"]["period"]
+    assert_equal ["The hotel field is required."], json_response["errors"]["hotel"]
+    assert_equal ["The room field is required."], json_response["errors"]["room"]
   end
 
   test "should reject invalid period" do
@@ -50,7 +59,10 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_includes json_response["error"], "Invalid period"
+    assert_equal 400, json_response["status"]
+    assert_equal ["The period field must be one of: Summer, Autumn, Winter, Spring."], json_response["errors"]["period"]
+    assert_not json_response["errors"].key?("hotel"), "Expected only period to have errors"
+    assert_not json_response["errors"].key?("room"), "Expected only period to have errors"
   end
 
   test "should reject invalid hotel" do
@@ -64,7 +76,10 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_includes json_response["error"], "Invalid hotel"
+    assert_equal 400, json_response["status"]
+    assert_equal ["The hotel field must be one of: FloatingPointResort, GitawayHotel, RecursionRetreat."], json_response["errors"]["hotel"]
+    assert_not json_response["errors"].key?("period"), "Expected only hotel to have errors"
+    assert_not json_response["errors"].key?("room"), "Expected only hotel to have errors"
   end
 
   test "should reject invalid room" do
@@ -78,6 +93,9 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_includes json_response["error"], "Invalid room"
+    assert_equal 400, json_response["status"]
+    assert_equal ["The room field must be one of: SingletonRoom, BooleanTwin, RestfulKing."], json_response["errors"]["room"]
+    assert_not json_response["errors"].key?("period"), "Expected only room to have errors"
+    assert_not json_response["errors"].key?("hotel"), "Expected only room to have errors"
   end
 end
