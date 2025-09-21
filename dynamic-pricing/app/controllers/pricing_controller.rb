@@ -5,6 +5,25 @@
 # It is safe to include and does not change runtime behavior of this class.
 require 'set'
 
+# PricingController serves the public pricing endpoint.
+#
+# Implements the Stale-While-Revalidate (SWR) caching strategy:
+# - https://datatracker.ietf.org/doc/html/rfc5861
+# - Fast path (stale data): If a requested (period, hotel, room) combination is cached,
+#   `RateApiService.get_rate` returns it immediately.
+# - Miss path: On cache miss, we acquire a short-lived distributed lock (per key), fetch from the
+#   upstream API, store for 5 minutes, and return the fresh value. This prevents cache stampedes and
+#   keeps the request path responsive rather than waiting for a background job.
+# - Revalidation: A worker runs every 2 minutes to batch-refresh all previously requested keys.
+#   If there are no cached keys, the worker does nothing.
+#
+# Quota and batching:
+# - Upstream limit: 1000 calls/day.
+# - 1 day = 24 hour x 60 minutes = 1440 minutes
+#   With a 2-minute interval we have 720 cycles/day
+# - The batch endpoint requires an array of parameter sets. For this API the domain is bounded:
+#   4 periods × 3 hotels × 3 rooms = 36 maximum combinations.
+# - Therefore, in a single day, the total number of API calls is bounded by 720 + 36 = 756.
 class PricingController < ApplicationController
   before_action :validate_params
 
