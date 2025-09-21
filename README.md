@@ -140,8 +140,7 @@ sequenceDiagram
     participant L as Distributed Lock
     participant U as Rate API
 
-    rect rgb(245,245,245)
-    note over C,A: Request Path (GET /pricing)
+    Note over C,A: Request Path (GET /pricing)
     C->>A: GET /pricing?period=..&hotel=..&room=..
     A->>R: GET key(period,hotel,room)
     alt Cache hit
@@ -160,19 +159,14 @@ sequenceDiagram
         A-->>C: 503 Service Unavailable
       end
     end
-    end
 
-    rect rgb(235,245,255)
-    note over A,R,U: Background Worker (every 2 minutes)
-    loop every 120s
-      A->>R: SMEMBERS rate_cache_keys
-      alt No cached keys
-        R-->>A: ∅ (do nothing)
-      else Has cached keys
-        A->>U: fetch_rates([period,hotel,room]...)
-        U-->>A: rates_dict
-        A->>R: SET each key = rate (TTL 300s)
-      end
-    end
+    Note over A,R: Background worker (every 120s)
+    A->>R: SMEMBERS rate_cache_keys
+    alt No cached keys
+      R-->>A: empty (do nothing)
+    else Has cached keys
+      A->>U: fetch_rates(batch requests)
+      U-->>A: rates_dict
+      A->>R: SET each key = rate (TTL 300s)
     end
 ```
