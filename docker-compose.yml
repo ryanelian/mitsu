@@ -7,8 +7,10 @@ services:
     volumes:
       - ./dynamic-pricing:/rails
     environment:
-      - REDIS_URL=redis://valkey:6379/1
+      - REDIS_URL=redis://valkey:6379/0
       - RATE_API_URL=http://rate-api:8080
+      - RATE_API_TOKEN=04aa6f42aa03f220c2ae9a276cd68c62 # this is just a simulation
+      - RATE_API_QUOTA=1000
     depends_on:
       - rate-api
       - valkey
