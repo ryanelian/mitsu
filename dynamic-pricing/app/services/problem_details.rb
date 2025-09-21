@@ -5,9 +5,8 @@
 #
 # This creates a JSON-serializable Hash shaped like:
 # {
-#   "type": "https://tools.ietf.org/html/rfc7231#section-6.5.1",
+#   "type": "https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.1",
 #   "title": "One or more validation errors occurred.",
-#   "status": 400,
 #   "traceId": "...optional trace id...",
 #   "instance": "/path/of/request",
 #   "errors": {
@@ -16,22 +15,32 @@
 # }
 #
 # Notes:
-# - We default the RFC 7231 400 reference into `type` for client error semantics, matching
-#   common conventions for validation failures.
 # - `errors` is a map of field name -> array of human-readable messages.
-# - The hash is intentionally not frozen so Rails can safely serialize it.
-module ValidationProblem
+module ProblemDetails
   module_function
 
-  DEFAULT_TYPE_FOR_400 = 'https://tools.ietf.org/html/rfc7231#section-6.5.1'.freeze
+  DEFAULT_TYPE_FOR_400 = 'https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.1'.freeze
   DEFAULT_VALIDATION_TITLE = 'One or more validation errors occurred.'.freeze
+  DEFAULT_TYPE_FOR_503 = 'https://datatracker.ietf.org/doc/html/rfc7231#section-6.6.4'.freeze
+  DEFAULT_SERVICE_UNAVAILABLE_TITLE = 'Service Temporarily Unavailable'.freeze
 
-  def build_validation_error(errors:, status: 400, title: DEFAULT_VALIDATION_TITLE, type: DEFAULT_TYPE_FOR_400, instance: nil, trace_id: nil)
+  def validation_error(errors:, title: DEFAULT_VALIDATION_TITLE, type: DEFAULT_TYPE_FOR_400, instance: nil, trace_id: nil)
     problem = {
       type: type,
       title: title,
-      status: status,
       errors: errors
+    }
+
+    problem[:instance] = instance if instance
+    problem[:traceId] = trace_id if trace_id
+
+    problem
+  end
+
+  def service_unavailable_error(title: DEFAULT_SERVICE_UNAVAILABLE_TITLE, type: DEFAULT_TYPE_FOR_503, instance: nil, trace_id: nil)
+    problem = {
+      type: type,
+      title: title,
     }
 
     problem[:instance] = instance if instance

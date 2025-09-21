@@ -13,8 +13,20 @@ class PricingController < ApplicationController
     hotel  = params[:hotel]
     room   = params[:room]
 
-    # TODO: Start to implement here
-    render json: { rate: "12000" }
+    begin
+      rate_value = RateApiService.get_rate(
+        period: period,
+        hotel: hotel,
+        room: room
+      )
+      RateApiService.increment_hit_count()
+      render json: { rate: rate_value }
+    rescue RateApiService::ServiceUnavailableError => e
+      render json: ProblemDetails.service_unavailable_error(
+        instance: request.path,
+        trace_id: request.request_id
+      ), status: :service_unavailable
+    end
   end
 
   private
@@ -72,9 +84,8 @@ module PricingValidation
 
     return nil if errors.empty?
 
-    problem = ValidationProblem.build_validation_error(
+    problem = ProblemDetails.validation_error(
       errors: errors,
-      status: 400,
       instance: instance,
       trace_id: trace_id
     )
