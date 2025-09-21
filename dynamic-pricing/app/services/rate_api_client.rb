@@ -39,28 +39,32 @@ class RateApiClient
     # @param requests [Array<Hash>] Array of request objects with period:, hotel:, room: keys
     # @return [Hash] Nested dictionary: rates[period][hotel][room] = rate_value or {} if error
     def fetch_rates(requests)
-        begin
-            uri = build_post_uri()
-            http = Net::HTTP.new(uri.host, uri.port)
-            http.open_timeout = @timeout_seconds
-            http.read_timeout = @timeout_seconds
+        Sentry.with_child_span(op: "RateApiClient#fetch_rates", description: "fetch rates from rate API") do |span|
+            span&.set_data("request_count", requests.length)
 
-            request = Net::HTTP::Post.new(uri.request_uri)
-            request['Content-Type'] = 'application/json'
-            request['token'] = AppSettings.rate_api_token
-            request.body = JSON.generate({ attributes: requests })
+            begin
+                uri = build_post_uri()
+                http = Net::HTTP.new(uri.host, uri.port)
+                http.open_timeout = @timeout_seconds
+                http.read_timeout = @timeout_seconds
 
-            response = http.request(request)
+                request = Net::HTTP::Post.new(uri.request_uri)
+                request['Content-Type'] = 'application/json'
+                request['token'] = AppSettings.rate_api_token
+                request.body = JSON.generate({ attributes: requests })
 
-            unless response.is_a?(Net::HTTPSuccess)
-                Rails.logger.warn "Rate API HTTP error: #{response.code} #{response.body}"
+                response = http.request(request)
+
+                unless response.is_a?(Net::HTTPSuccess)
+                    Rails.logger.warn "Rate API HTTP error: #{response.code} #{response.body}"
+                    return {}
+                end
+
+                parse_rates(response.body)
+            rescue StandardError => e
+                Rails.logger.warn "Rate API client error: #{e.message}"
                 return {}
             end
-
-            parse_rates(response.body, requests.length)
-        rescue StandardError => e
-            Rails.logger.warn "Rate API client error: #{e.message}"
-            return {}
         end
     end
 
@@ -87,8 +91,6 @@ class RateApiClient
         nil
     end
 
-    private
-
     # Builds the URI for the POST request.
     # @return [URI] The URI for the POST request
     def build_post_uri()
@@ -100,44 +102,45 @@ class RateApiClient
     # Parses the API response and returns a nested dictionary of rates.
     # If unable to parse the response, it will return an empty hash.
     # @param body [String] The API response body
-    # @param expected_count [Integer] The expected number of rates
     # @return [Hash] Nested dictionary: rates[period][hotel][room] = rate_value or {} if error
-    def parse_rates(body, expected_count)
-        begin
-            parsed = JSON.parse(body)
-        rescue JSON::ParserError
-            Rails.logger.warn "Failed to parse API response JSON"
-            return {}
-        end
-
-        # Handle different response formats for multiple rates
-        if parsed.is_a?(Hash) && parsed['rates'].is_a?(Array)
-            rates = parsed['rates']
-        else
-            Rails.logger.warn "Unexpected API response format: #{parsed.class}"
-            return {}
-        end
-
-        # Build nested dictionary structure: rates[period][hotel][room] = rate
-        result = {}
-        rates.each do |item|
-            if item.is_a?(Hash) && item.key?('rate') && item.key?('period') && item.key?('hotel') && item.key?('room')
-                period = item['period']
-                hotel = item['hotel']
-                room = item['room']
-                rate = item['rate']
-
-                # Initialize nested structure
-                result[period] ||= {}
-                result[period][hotel] ||= {}
-                result[period][hotel][room] = rate
-            else
-                Rails.logger.warn "Malformed rate item: #{item.inspect}"
-                # Skip malformed items, continue processing
+    def parse_rates(body)
+        Sentry.with_child_span(op: "RateApiClient#parse_rates", description: "parse rate API response") do |span|
+            begin
+                parsed = JSON.parse(body)
+            rescue JSON::ParserError
+                Rails.logger.warn "Failed to parse API response JSON"
+                return {}
             end
-        end
 
-        result
+            # Handle different response formats for multiple rates
+            if parsed.is_a?(Hash) && parsed['rates'].is_a?(Array)
+                rates = parsed['rates']
+            else
+                Rails.logger.warn "Unexpected API response format: #{parsed.class}"
+                return {}
+            end
+
+            # Build nested dictionary structure: rates[period][hotel][room] = rate
+            result = {}
+            rates.each do |item|
+                if item.is_a?(Hash) && item.key?('rate') && item.key?('period') && item.key?('hotel') && item.key?('room')
+                    period = item['period']
+                    hotel = item['hotel']
+                    room = item['room']
+                    rate = item['rate']
+
+                    # Initialize nested structure
+                    result[period] ||= {}
+                    result[period][hotel] ||= {}
+                    result[period][hotel][room] = rate
+                else
+                    Rails.logger.warn "Malformed rate item: #{item.inspect}"
+                    # Skip malformed items, continue processing
+                end
+            end
+
+            result
+        end
     end
 end
 

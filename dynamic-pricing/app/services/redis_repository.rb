@@ -23,54 +23,77 @@ class RedisRepository
     # Ping the Redis server. Returns true if successful, false otherwise.
     # Logs an error if the ping fails. Used in health check endpoint.
     def ping()
-        begin
-            if @client.ping() == "PONG"
-                return true
-            else
-                Rails.logger.error "Redis ping failed"
+        Sentry.with_child_span(op: "RedisRepository#ping", description: "ping Redis server") do |span|
+            begin
+                if @client.ping() == "PONG"
+                    return true
+                else
+                    Rails.logger.error "Redis ping failed"
+                end
+            rescue => e
+                Rails.logger.error "Error pinging Redis: #{e}"
             end
-        rescue => e
-            Rails.logger.error "Error pinging Redis: #{e}"
+            false
         end
-        false
     end
 
     # Get a value by key (returns nil if missing)
     def get(key)
-        @client.get(key)
+        Sentry.with_child_span(op: "RedisRepository#get", description: "get Redis key") do |span|
+            span&.set_data("key", key)
+            @client.get(key)
+        end
     end
 
     # Set a value with TTL in seconds
     def set(key, ttl_seconds, value)
-        @client.setex(key, ttl_seconds, value)
+        Sentry.with_child_span(op: "RedisRepository#set", description: "set Redis key") do |span|
+            span&.set_data("key", key)
+            @client.setex(key, ttl_seconds, value)
+        end
     end
 
     # Increment a counter by 1 and return the new value
     # Useful for tracking metrics like API call counts
     def increment(key)
-        @client.incr(key)
+        Sentry.with_child_span(op: "RedisRepository#increment", description: "increment Redis counter") do |span|
+            span&.set_data("key", key)
+            @client.incr(key)
+        end
     end
 
     # Increment a counter by a specific amount and return the new value
     # Useful for tracking metrics like API call counts
     def increment_by(key, amount)
-        @client.incrby(key, amount)
+        Sentry.with_child_span(op: "RedisRepository#increment_by", description: "increment Redis counter by amount") do |span|
+            span&.set_data("key", key)
+            @client.incrby(key, amount)
+        end
     end
 
     # Get the current value of a counter
     def get_counter(key)
-        value = @client.get(key)
-        value ? value.to_i : 0
+        Sentry.with_child_span(op: "RedisRepository#get_counter", description: "get Redis counter value") do |span|
+            span&.set_data("key", key)
+            value = @client.get(key)
+            value ? value.to_i : 0
+        end
     end
 
     # Add a member to a Redis set
     def add_to_set(set_key, member)
-        @client.sadd(set_key, member)
+        Sentry.with_child_span(op: "RedisRepository#add_to_set", description: "add member to Redis set") do |span|
+            span&.set_data("key", set_key)
+            @client.sadd(set_key, member)
+        end
     end
 
     # Get all members of a Redis set
     def get_set_members(set_key)
-        @client.smembers(set_key)
+        Sentry.with_child_span(op: "RedisRepository#get_set_members", description: "get Redis set members") do |span|
+            span&.set_data("key", set_key)
+            @client.smembers(set_key)
+        end
     end
 
     # ======================================================================
@@ -226,23 +249,26 @@ class RedisRepository
     # @yield Block to execute while holding the lock
     # @return [Object] Result of the block if lock was acquired, nil otherwise
     def with_lock(resource, ttl_milliseconds: 10_000, retry_count: 3, &block)
-        # Step 1: Attempt to acquire the lock
-        token = lock(resource, ttl_milliseconds: ttl_milliseconds, retry_count: retry_count)
-        return nil unless token  # Failed to acquire lock
+        Sentry.with_child_span(op: "RedisRepository#with_lock", description: "execute block with Redis lock") do |span|
+            span&.set_data("key", resource)
+            # Step 1: Attempt to acquire the lock
+            token = lock(resource, ttl_milliseconds: ttl_milliseconds, retry_count: retry_count)
+            return nil unless token  # Failed to acquire lock
 
-        begin
-            # Step 2: Execute the block while holding the lock
-            Rails.logger.debug "Redlock: Executing block with lock for '#{resource}'"
+            begin
+                # Step 2: Execute the block while holding the lock
+                Rails.logger.debug "Redlock: Executing block with lock for '#{resource}'"
 
-            # &block captures the code block passed to with_lock
-            # similar to Lambda Expression in C#
-            result = yield
+                # &block captures the code block passed to with_lock
+                # similar to Lambda Expression in C#
+                result = yield
 
-            # Step 3: Return the result
-            result
-        ensure
-            # Step 4: Always release the lock, even if block raises an exception
-            unlock(resource, token)
+                # Step 3: Return the result
+                result
+            ensure
+                # Step 4: Always release the lock, even if block raises an exception
+                unlock(resource, token)
+            end
         end
     end
 

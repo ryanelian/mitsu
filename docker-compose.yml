@@ -11,6 +11,7 @@ services:
       - RATE_API_URL=http://rate-api:8080
       - RATE_API_TOKEN=04aa6f42aa03f220c2ae9a276cd68c62 # this is just a simulation
       - RATE_API_QUOTA=1000
+      - SENTRY_DSN=https://630971d356a3e5707744dd367d3007ee@o4506653359341568.ingest.us.sentry.io/4510058382622720
     depends_on:
       - rate-api
       - valkey
@@ -57,6 +58,7 @@ services:
       - RATE_API_URL=http://rate-api:8080
       - RATE_API_TOKEN=04aa6f42aa03f220c2ae9a276cd68c62
       - RATE_API_QUOTA=1000
+      - SENTRY_DSN=https://630971d356a3e5707744dd367d3007ee@o4506653359341568.ingest.us.sentry.io/4510058382622720
     depends_on:
       - app
     command: bundle exec rake worker_service:run

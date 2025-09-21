@@ -38,6 +38,73 @@ This efficient service that acts as an intermediary to the dynamic pricing model
 - Behavior with no cached keys:
   - The worker does nothing if no keys were requested yet. New keys are populated on-demand by request-path misses.
 
+## Distributed Trace
+
+The application is instrumented with [Sentry.io](https://sentry.io/) for distributed tracing and error monitoring. Sentry automatically captures performance traces showing the flow between the Rails API, Redis cache, distributed locks, and external Rate API.
+
+In addition, Sentry provides centralized logging and automatic error triage for both the web application and background worker processes.
+
+To enable Sentry tracing in your local environment, set the `SENTRY_DSN` environment variable:
+
+```bash
+export SENTRY_DSN="https://your-dsn@sentry.io/project-id"
+```
+
+If no `SENTRY_DSN` is provided, the application will continue to run normally without Sentry (it will only log a warning message).
+
+The traces below show typical request flows captured by Sentry:
+
+### Cache Hit
+![Distributed trace showing cache hit scenario](img/dtrace_cache_hit.png)
+
+### Cache Miss
+![Distributed trace showing cache miss scenario](img/dtrace_cache_miss.png)
+
+### Background Worker
+![Distributed trace showing background worker refresh](img/dtrace_worker.png)
+
+## Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant A as Rails API
+    participant R as Valkey (Redis)
+    participant L as Distributed Lock
+    participant U as Rate API
+
+    Note over C,A: Request Path (GET /pricing)
+    C->>A: GET /pricing?period=..&hotel=..&room=..
+    A->>R: GET key(period,hotel,room)
+    alt Cache hit
+      R-->>A: cached rate
+      A-->>C: 200 { rate }
+    else Cache miss
+      R-->>A: (nil)
+      A->>L: Acquire per-key lock (TTL ~30s)
+      alt Lock acquired
+        A->>U: fetch_rate(period, hotel, room)
+        U-->>A: rate
+        A->>R: SET key = rate (TTL 300s)
+        A->>R: SADD rate_cache_keys key
+        A-->>C: 200 { rate }
+      else Lock not acquired (rare)
+        A-->>C: 503 Service Unavailable
+      end
+    end
+
+    Note over A,R: Background worker (every 120s)
+    A->>R: SMEMBERS rate_cache_keys
+    alt No cached keys
+      R-->>A: empty (do nothing)
+    else Has cached keys
+      A->>U: fetch_rates(batch requests)
+      U-->>A: rates_dict
+      A->>R: SET each key = rate (TTL 300s)
+    end
+```
+
 ## API Endpoint
 
 GET `/pricing?period=Summer&hotel=FloatingPointResort&room=SingletonRoom`
@@ -127,46 +194,4 @@ Stop and remove all services started by docker-compose:
 If you need to remove containers, networks, and volumes forcefully:
 ```bash
 docker compose down -v --remove-orphans
-```
-
-## Sequence Diagram (SWR Request + Worker Refresh)
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Client
-    participant A as Rails API
-    participant R as Valkey (Redis)
-    participant L as Distributed Lock
-    participant U as Rate API
-
-    Note over C,A: Request Path (GET /pricing)
-    C->>A: GET /pricing?period=..&hotel=..&room=..
-    A->>R: GET key(period,hotel,room)
-    alt Cache hit
-      R-->>A: cached rate
-      A-->>C: 200 { rate }
-    else Cache miss
-      R-->>A: (nil)
-      A->>L: Acquire per-key lock (TTL ~30s)
-      alt Lock acquired
-        A->>U: fetch_rate(period, hotel, room)
-        U-->>A: rate
-        A->>R: SET key = rate (TTL 300s)
-        A->>R: SADD rate_cache_keys key
-        A-->>C: 200 { rate }
-      else Lock not acquired (rare)
-        A-->>C: 503 Service Unavailable
-      end
-    end
-
-    Note over A,R: Background worker (every 120s)
-    A->>R: SMEMBERS rate_cache_keys
-    alt No cached keys
-      R-->>A: empty (do nothing)
-    else Has cached keys
-      A->>U: fetch_rates(batch requests)
-      U-->>A: rates_dict
-      A->>R: SET each key = rate (TTL 300s)
-    end
 ```

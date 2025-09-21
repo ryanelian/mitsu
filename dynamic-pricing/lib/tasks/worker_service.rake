@@ -23,7 +23,33 @@ namespace :worker_service do
     Rails.logger.info "Loading Rails environment..."
 
     loop do
-      RateApiService.refresh_all_cached_rates
+      # Start a transaction for this iteration of the worker service
+      transaction = Sentry.start_transaction(name: "worker_service_iteration", op: "worker.background")
+
+      begin
+        # Set the transaction on the scope so child spans are attached
+        Sentry.get_current_scope.set_span(transaction)
+
+        # Create a span for the rate refresh operation
+        Sentry.with_child_span(op: "rate_refresh", description: "Refresh all cached rates") do |span|
+          result = RateApiService.refresh_all_cached_rates
+
+          # Add data attributes to the span
+          span&.set_data("cached_keys_count", result[:updated] + result[:errors])
+          span&.set_data("updated_count", result[:updated])
+          span&.set_data("error_count", result[:errors])
+
+          Rails.logger.info "Rate refresh completed: #{result[:updated]} updated, #{result[:errors]} errors"
+        end
+
+      rescue => e
+        Rails.logger.error "Error in worker service iteration: #{e.message}"
+        # Capture any errors in the transaction
+        Sentry.capture_exception(e)
+      ensure
+        # Always finish the transaction
+        transaction.finish
+      end
 
       # Sleep for 120 seconds (2 minutes)
       sleep 120
