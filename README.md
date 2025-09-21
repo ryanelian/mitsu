@@ -176,7 +176,7 @@ This app implements an API Gateway pattern that forwards requests from `localhos
 - ✅ **Enhances security** - allows not exposing public API directly and allows OAuth 2.0 Proxy to be implemented in the future
 - ✅ **Separation of concerns** - API calls to microservices can be aggregated in `/api` routes in the front-end.
 
-![Frontend Dashboard Screenshot](img/frontend-dashboard.png)
+![Frontend Dashboard Screenshot](img/dashboard.png)
 
 ## Quick Start Guide
 
