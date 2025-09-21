@@ -63,6 +63,41 @@ The traces below show typical request flows captured by Sentry:
 ### Background Worker
 ![Distributed trace showing background worker refresh](img/dtrace_worker.png)
 
+## Docker Image
+
+### Automated Image Publishing
+
+A Docker image of the Dynamic Pricing Proxy is automatically built and published to GitHub Packages whenever changes are pushed to the `main` branch:
+
+- **Image Repository**: `ghcr.io/{owner}/mitsu/dynamic-pricing-proxy`
+- **Trigger**: Push to `main` branch (only when `dynamic-pricing/` files change)
+- **Tags**: Multiple tags are created including:
+  - `latest` (current main branch)
+  - `main` (branch name)
+  - `main-{sha}` (commit SHA with branch prefix)
+
+### Using the Published Image
+
+To pull and run the latest published image:
+
+```bash
+# Pull the latest image
+docker pull ghcr.io/{owner}/mitsu/dynamic-pricing-proxy:latest
+
+# Run the container
+docker run -p 3000:3000 ghcr.io/{owner}/mitsu/dynamic-pricing-proxy:latest
+```
+
+Replace `{owner}` with your GitHub username or organization name.
+
+### Manual Image Building
+
+For local development, use the provided build script:
+
+```bash
+./build.sh
+```
+
 ## Sequence Diagram
 
 ```mermaid
@@ -115,9 +150,40 @@ GET `/pricing?period=Summer&hotel=FloatingPointResort&room=SingletonRoom`
   - `room`: `SingletonRoom`, `BooleanTwin`, `RestfulKing`
 
 Responses:
-- 200 `{ "rate": "<value>" }`
-- 400 Problem Details (invalid parameters)
-- 503 Problem Details (temporary unavailability)
+
+- **200 OK** - Successful response with calculated rate
+  ```json
+  { "rate": "125.75" }
+  ```
+
+- **400 Bad Request** - Invalid request parameters (follows [RFC 7231 Section 6.5.1](https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.1))
+  - Returned when query parameters contain invalid values outside the allowed set
+  - Response follows [RFC 7807 Problem Details](https://datatracker.ietf.org/doc/html/rfc7807) format:
+  ```json
+  {
+    "type": "https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.1",
+    "title": "One or more validation errors occurred.",
+    "instance": "/pricing",
+    "traceId": "abc-123-def-456",
+    "errors": {
+      "period": ["must be one of: Summer, Autumn, Winter, Spring"],
+      "hotel": ["must be one of: FloatingPointResort, GitawayHotel, RecursionRetreat"],
+      "room": ["must be one of: SingletonRoom, BooleanTwin, RestfulKing"]
+    }
+  }
+  ```
+
+- **503 Service Unavailable** - Temporary service unavailability (follows [RFC 7231 Section 6.6.4](https://datatracker.ietf.org/doc/html/rfc7231#section-6.6.4))
+  - Returned when the service cannot acquire a distributed lock to fetch fresh data
+  - Response follows [RFC 7807 Problem Details](https://datatracker.ietf.org/doc/html/rfc7807) format:
+  ```json
+  {
+    "type": "https://datatracker.ietf.org/doc/html/rfc7231#section-6.6.4",
+    "title": "Service Temporarily Unavailable",
+    "instance": "/pricing",
+    "traceId": "xyz-789-uvw-012"
+  }
+  ```
 
 ## Development Environment Setup
 
@@ -128,6 +194,8 @@ The provided `Dockerfile` builds a container with all necessary dependencies. Yo
 ## Frontend User Interface
 
 The project includes a modern Next.js React-based frontend application (`dynamic-pricing-ui/`) that provides a complete user experience for testing and monitoring the dynamic pricing proxy.
+
+![Frontend Dashboard Screenshot](img/dashboard.png)
 
 ### Running the Frontend
 
@@ -175,8 +243,6 @@ This app implements an API Gateway pattern that forwards requests from `localhos
 - ✅ **Bypasses CORS restrictions** - more secure
 - ✅ **Enhances security** - allows not exposing public API directly and allows OAuth 2.0 Proxy to be implemented in the future
 - ✅ **Separation of concerns** - API calls to microservices can be aggregated in `/api` routes in the front-end.
-
-![Frontend Dashboard Screenshot](img/dashboard.png)
 
 ## Quick Start Guide
 
