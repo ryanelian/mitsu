@@ -18,11 +18,11 @@ This efficient service that acts as an intermediary to the dynamic pricing model
 
 4.  Scale the Proxy: The proxy must handle at least 10,000 requests per day and should scale horizontally (multiple instances behind a load balancer) to support millions of requests per day while maintaining the 5-minute rate validity constraint.
 
-## Architecture and SWR Caching
+## Architecture
 
-- Caching strategy (SWR):
+- This project employs modern caching strategy with SWR (Stale-While-Revalidating):
   - Fast path (stale data): if a requested `(period, hotel, room)` is cached, the API returns it immediately.
-  - Miss path: on cache miss, we acquire a short-lived distributed lock (per key), fetch from the upstream Rate API, store for 5 minutes (300s), and return the fresh value. This prevents cache stampedes and keeps requests fast.
+  - On cache miss, we acquire a short-lived distributed lock (per key), fetch from the upstream Rate API, store for 5 minutes (300s), and return the fresh value. This prevents cache stampedes and keeps requests fast for end-users.
   - Revalidation: a background worker runs every 2 minutes to batch-refresh all previously requested keys. If there are no cached keys, the worker does nothing.
 
 - Data validity and refresh cadence:
@@ -124,6 +124,59 @@ Responses:
 The project scaffold is a minimal Ruby on Rails application with a `/pricing` endpoint. This repository is pre-configured for a Docker-based workflow that supports live reloading for your convenience.
 
 The provided `Dockerfile` builds a container with all necessary dependencies. Your local code is mounted directly into the container, so any changes you make on your machine will be reflected immediately. Your application will need to communicate with the external pricing model, which also runs in its own Docker container.
+
+## Frontend User Interface
+
+The project includes a modern Next.js React-based frontend application (`dynamic-pricing-ui/`) that provides a complete user experience for testing and monitoring the dynamic pricing proxy.
+
+### Running the Frontend
+
+To start the frontend development server:
+
+```bash
+brew install fnm
+fnm install
+fnm use
+npm install -g pnpm
+cd dynamic-pricing-ui
+pnpm install
+pnpm dev
+```
+
+The UI will be available at `http://localhost:3001`.
+
+### Capabilities
+
+The frontend application provides comprehensive testing and monitoring tools:
+
+#### 🧮 **Pricing Calculator**
+- Interactive form to test pricing requests with all valid (and invalid) parameter combinations
+- Real-time rate calculation display
+- Validation and error handling
+- Last updated timestamp tracking
+
+#### 📊 **System Health & Metrics Dashboard**
+- Real-time system status monitoring (API status, Redis connectivity)
+- Live metrics display (quota usage, API call counts, hit rates)
+- Visual indicators for system health
+- Auto-refreshing data with configurable intervals
+- Animated circular progress indicator to next refresh time
+
+#### ⚡ **Stress Testing Suite**
+- **Comprehensive Burst Test**: 360 concurrent requests testing all parameter combinations
+- **Randomized Sustained Test**: 1 million sequential requests for load testing
+- Real-time progress tracking with animated progress bars
+- Detailed performance metrics (success rates, response times, throughput)
+
+### Backend-for-Frontend (BFF) Architecture
+
+This app implements an API Gateway pattern that forwards requests from `localhost:3001` to `localhost:3000` (Dynamic Pricing Proxy Rails API). This approach:
+
+- ✅ **Bypasses CORS restrictions** - more secure
+- ✅ **Enhances security** - allows not exposing public API directly and allows OAuth 2.0 Proxy to be implemented in the future
+- ✅ **Separation of concerns** - API calls to microservices can be aggregated in `/api` routes in the front-end.
+
+![Frontend Dashboard Screenshot](img/frontend-dashboard.png)
 
 ## Quick Start Guide
 
