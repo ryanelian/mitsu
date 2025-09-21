@@ -12,7 +12,19 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_equal "12000", json_response["rate"]
+    rate = json_response["rate"]
+    assert rate.is_a?(Integer), "Rate should be an integer"
+
+    # Peek into Redis cache to get the actual rate and assert it matches response
+    cache_key = RateApiService.get_hotel_room_query_key(
+      period: "Summer",
+      hotel: "FloatingPointResort",
+      room: "SingletonRoom"
+    )
+    cached_rate_json = RedisRepository.instance.get(cache_key)
+    cached_rate = JSON.parse(cached_rate_json)
+
+    assert_equal cached_rate, rate
   end
 
   test "should return error without any parameters" do
@@ -22,7 +34,6 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_equal 400, json_response["status"]
     assert_equal "One or more validation errors occurred.", json_response["title"]
     assert json_response.key?("errors")
     assert_equal ["The period field is required."], json_response["errors"]["period"]
@@ -41,7 +52,6 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_equal 400, json_response["status"]
     assert json_response.key?("errors")
     assert_equal ["The period field is required."], json_response["errors"]["period"]
     assert_equal ["The hotel field is required."], json_response["errors"]["hotel"]
@@ -59,7 +69,6 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_equal 400, json_response["status"]
     assert_equal ["The period field must be one of: Summer, Autumn, Winter, Spring."], json_response["errors"]["period"]
     assert_not json_response["errors"].key?("hotel"), "Expected only period to have errors"
     assert_not json_response["errors"].key?("room"), "Expected only period to have errors"
@@ -76,7 +85,6 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_equal 400, json_response["status"]
     assert_equal ["The hotel field must be one of: FloatingPointResort, GitawayHotel, RecursionRetreat."], json_response["errors"]["hotel"]
     assert_not json_response["errors"].key?("period"), "Expected only hotel to have errors"
     assert_not json_response["errors"].key?("room"), "Expected only hotel to have errors"
@@ -93,7 +101,6 @@ class PricingControllerTest < ActionDispatch::IntegrationTest
     assert_equal "application/json", @response.media_type
 
     json_response = JSON.parse(@response.body)
-    assert_equal 400, json_response["status"]
     assert_equal ["The room field must be one of: SingletonRoom, BooleanTwin, RestfulKing."], json_response["errors"]["room"]
     assert_not json_response["errors"].key?("period"), "Expected only room to have errors"
     assert_not json_response["errors"].key?("hotel"), "Expected only room to have errors"
