@@ -12,22 +12,14 @@
 !/.env*.erb
 
 # Ignore all logfiles and tempfiles.
-/log/*
-/tmp/*
-!/log/.keep
-!/tmp/.keep
-
-# Ignore pidfiles, but keep the directory.
-/tmp/pids/*
-!/tmp/pids/
-!/tmp/pids/.keep
+/log
+/tmp
 
 # Ignore storage (uploaded files in development and any SQLite databases).
 /storage/*
-!/storage/.keep
-/tmp/storage/*
-!/tmp/storage/
-!/tmp/storage/.keep
+
+# Ignore keep files, these files are needed to keep the directory structure
+!*.keep
 
 # Ignore master key for decrypting credentials and more.
 /config/master.key

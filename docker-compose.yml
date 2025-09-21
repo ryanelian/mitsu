@@ -14,19 +14,22 @@ services:
     depends_on:
       - rate-api
       - valkey
+    restart: always
 
   rate-api:
     image: tripladev/rate-api:latest
     container_name: rate-api
     ports:
       - "8080:8080"
-
+    restart: always
+    
   valkey:
     image: valkey/valkey:latest
     container_name: valkey
     ports:
       - "6379:6379"
-
+    restart: always
+    
   redisinsight:
     image: redis/redisinsight:latest
     container_name: redisinsight
@@ -39,6 +42,25 @@ services:
       - redisinsight:/data
     depends_on:
       - valkey
+    restart: always
+
+  # worker-service refresh the rates in the background every 2 minutes
+  # unfortunately, because the worker-service is run with rake
+  # it does not have a hot reload mechanism unlike the app service
+  # if you make modifications to the logic, you will need to rebuild the image
+  # and restart the container
+  worker-service:
+    image: dynamic-pricing-proxy
+    container_name: worker-service
+    environment:
+      - REDIS_URL=redis://valkey:6379/0
+      - RATE_API_URL=http://rate-api:8080
+      - RATE_API_TOKEN=04aa6f42aa03f220c2ae9a276cd68c62
+      - RATE_API_QUOTA=1000
+    depends_on:
+      - app
+    command: bundle exec rake worker_service:run
+    restart: always
 
 volumes:
   redisinsight:
