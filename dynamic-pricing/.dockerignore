@@ -15,20 +15,11 @@
 /config/credentials/*.key
 
 # Ignore all logfiles and tempfiles.
-/log/*
-/tmp/*
-!/log/.keep
-!/tmp/.keep
-
-# Ignore pidfiles, but keep the directory.
-/tmp/pids/*
-!/tmp/pids/.keep
+/log
+/tmp
 
 # Ignore storage (uploaded files in development and any SQLite databases).
 /storage/*
-!/storage/.keep
-/tmp/storage/*
-!/tmp/storage/.keep
 
 # Development specific ignores
 node_modules/
@@ -41,7 +32,9 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
-*~
+
+# Ignore keep files, these files are needed to keep the directory structure
+!*.keep
 
 # OS generated files
 .DS_Store

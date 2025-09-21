@@ -27,6 +27,9 @@ RUN apk add --no-cache \
 COPY Gemfile Gemfile.lock /rails/
 RUN bundle install --gemfile=/rails/Gemfile
 
+# Copy application source code
+COPY . /rails
+
 # Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
 CMD ["sh", "-c", "./bin/rails db:prepare && ./bin/rails server -b 0.0.0.0"]
