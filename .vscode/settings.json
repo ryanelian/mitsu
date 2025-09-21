@@ -1,3 +1,10 @@
 {
-    "kiroAgent.configureMCP": "Disabled"
+	"files.associations": {
+		"*.css": "tailwindcss"
+	},
+	"tailwindCSS.classFunctions": [
+		"tx",
+		"tv"
+	],
+	"typescript.preferences.preferTypeOnlyAutoImports": true
 }
