@@ -15,17 +15,14 @@ Sentry.init do |config|
   # see https://docs.sentry.io/platforms/ruby/data-management/data-collected/ for more info
   config.send_default_pii = true
 
-  # Enable sending logs to Sentry
-  config.enable_logs = true
-  # Patch Ruby logger to forward logs
-  config.enabled_patches = [:logger]
+  # Disable sending all logs to Sentry to reduce noise
+  config.enable_logs = false
+  # Don't patch logger to avoid forwarding all logs
+  # config.enabled_patches = [:logger]
+  config.enabled_patches = []
 
   # Set traces_sample_rate to 1.0 to capture 100%
   # of transactions for tracing.
   # We recommend adjusting this value in production.
-  config.traces_sample_rate = 1.0
-  # or
-  config.traces_sampler = lambda do |context|
-    true
-  end
+  config.traces_sample_rate = 0
 end

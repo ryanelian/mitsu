@@ -48,7 +48,7 @@ namespace :worker_service do
         Sentry.capture_exception(e)
       ensure
         # Always finish the transaction
-        transaction.finish
+        transaction&.finish
       end
 
       # Sleep for 120 seconds (2 minutes)
