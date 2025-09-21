@@ -86,20 +86,48 @@ class RateApiService
   end
 
   # Refresh all cached rate keys by fetching them in batch and updating cache
-  # This method uses the RateApiClient's batch processing capability for efficiency
+  # based on the Stale-While-Revalidate (SWR) pattern:
+  # - https://datatracker.ietf.org/doc/html/rfc5861
+  # - Request path (`get_rate`) returns fast from cache when present.
+  # - On cache miss, we take a short-lived distributed lock, fetch from the API,
+  #   store the result for 5 minutes (300s), and return the API response immediately.
+  #   This balances performance and stability (no stampedes, callers do not wait for the worker).
+  # - Separately, a background worker runs every 2 minutes to proactively refresh any keys
+  #   that have previously been requested and cached. If there are no cached keys, it does nothing.
+  #
+  # Cache freshness and API quota:
+  # - TTL is 5 minutes. The worker runs each 2 minutes, so stale values are refreshed
+  #   well before they expire in normal operation.
+  # - Upstream rate API has a daily limit of 1000 calls. With a 2-minute interval:
+  #   24 hours × 60 minutes = 1440 minutes; 1440 / 2 = 720 refresh cycles/day.
+  #   Even at one batch request per cycle, this remains under the 1000 calls/day limit!
+  #
+  # Trade-offs:
+  # - The refresh uses a batch endpoint that accepts an array of parameter combinations.
+  #   That payload can grow, but we know the combinatorics are bounded for this API:
+  #   4 periods × 3 hotels × 3 rooms = 36 max combinations.
+  # - Therefore, in a single day, the total number of API calls is bounded by 720 + 36 = 756.
+  #
+  # Behavior with no cached keys:
+  # - If the set of cached keys is empty, there is nothing to refresh and the worker exits quickly.
+  #
   # @return [Hash] Summary of refresh operation: { updated: count, errors: count }
   def self.refresh_all_cached_rates
     repo = RedisRepository.instance
     cached_keys = get_cached_rate_keys
 
     if cached_keys.empty?
+      # No keys have been cached yet (e.g., system just started or no traffic).
+      # In SWR, doing nothing here is correct: we only refresh items that have
+      # been requested at least once. New items are filled by request-path misses.
       Rails.logger.info "No cached rate keys found to refresh"
       return { updated: 0, errors: 0 }
     end
 
     Rails.logger.info "Refreshing #{cached_keys.length} cached rate keys"
 
-    # Parse all cached keys back to request objects
+    # Parse all cached keys back to request objects for batch submission.
+    # Note: keys are JSON with a fixed field order (period -> hotel -> room).
     requests = []
     cached_keys.each do |key|
       begin
@@ -116,7 +144,8 @@ class RateApiService
 
     return { updated: 0, errors: requests.length } if requests.empty?
 
-    # Fetch all rates in batch using the API client's batch processing
+    # Fetch all rates in one batch request.
+    # Trade-off: payload includes all known combinations, but the domain is bounded (max 36).
     rate_client = RateApiClient.new
     rates_dict = rate_client.fetch_rates(requests)
 
@@ -125,9 +154,9 @@ class RateApiService
       return { updated: 0, errors: requests.length }
     end
 
-    # We successfully fetched the rates
+    # We successfully fetched the rates as a single API call.
     increment_api_call_count()
-    # Update cache for each successfully fetched rate
+    # Update cache for each successfully fetched rate (5-minute TTL / 300s).
     updated_count = 0
     error_count = 0
 
@@ -144,7 +173,8 @@ class RateApiService
            rates_dict[period][hotel].key?(room)
           rate_value = rates_dict[period][hotel][room]
 
-          # Update cache with new rate
+          # Update cache with new rate; TTL 300s keeps data fresh while allowing headroom
+          # for the 2-minute worker refresh cadence.
           repo.set(key, 300, rate_value.to_json)
           updated_count += 1
         else

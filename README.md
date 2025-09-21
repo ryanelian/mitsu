@@ -18,6 +18,40 @@ This efficient service that acts as an intermediary to the dynamic pricing model
 
 4.  Scale the Proxy: The proxy must handle at least 10,000 requests per day and should scale horizontally (multiple instances behind a load balancer) to support millions of requests per day while maintaining the 5-minute rate validity constraint.
 
+## Architecture and SWR Caching
+
+- Caching strategy (SWR):
+  - Fast path (stale data): if a requested `(period, hotel, room)` is cached, the API returns it immediately.
+  - Miss path: on cache miss, we acquire a short-lived distributed lock (per key), fetch from the upstream Rate API, store for 5 minutes (300s), and return the fresh value. This prevents cache stampedes and keeps requests fast.
+  - Revalidation: a background worker runs every 2 minutes to batch-refresh all previously requested keys. If there are no cached keys, the worker does nothing.
+
+- Data validity and refresh cadence:
+  - Cache TTL is 5 minutes.
+  - Worker refresh runs every 2 minutes, so stale values are refreshed well before expiry in normal operation.
+
+- Quota and batching:
+  - Upstream limit: 1000 calls/day.
+  - 1 day = 24 hours × 60 minutes = 1440 minutes; with a 2-minute interval there are 720 refresh cycles/day.
+  - The batch endpoint accepts an array of parameter sets. For this API the domain is bounded: 4 periods × 3 hotels × 3 rooms = 36 maximum combinations.
+  - Therefore, in a single day, the total number of API calls is bounded by 720 (worker) + 36 (first-time misses) = 756, well under the 1000 limit.
+
+- Behavior with no cached keys:
+  - The worker does nothing if no keys were requested yet. New keys are populated on-demand by request-path misses.
+
+## API Endpoint
+
+GET `/pricing?period=Summer&hotel=FloatingPointResort&room=SingletonRoom`
+
+- Allowed values:
+  - `period`: `Summer`, `Autumn`, `Winter`, `Spring`
+  - `hotel`: `FloatingPointResort`, `GitawayHotel`, `RecursionRetreat`
+  - `room`: `SingletonRoom`, `BooleanTwin`, `RestfulKing`
+
+Responses:
+- 200 `{ "rate": "<value>" }`
+- 400 Problem Details (invalid parameters)
+- 503 Problem Details (temporary unavailability)
+
 ## Development Environment Setup
 
 The project scaffold is a minimal Ruby on Rails application with a `/pricing` endpoint. This repository is pre-configured for a Docker-based workflow that supports live reloading for your convenience.
@@ -95,8 +129,50 @@ If you need to remove containers, networks, and volumes forcefully:
 docker compose down -v --remove-orphans
 ```
 
-## Notes
+## Sequence Diagram (SWR Request + Worker Refresh)
 
-- The Rails container mounts `./dynamic-pricing:/rails`, so code changes are reflected immediately. (Hot Reload)
-- If you change service definitions, restart with `docker compose down && ./dev.sh`.
-- To stop all services: `docker compose down`.
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant A as Rails API
+    participant R as Valkey (Redis)
+    participant L as Distributed Lock
+    participant U as Rate API
+
+    rect rgb(245,245,245)
+    note over C,A: Request Path (GET /pricing)
+    C->>A: GET /pricing?period=..&hotel=..&room=..
+    A->>R: GET key(period,hotel,room)
+    alt Cache hit
+      R-->>A: cached rate
+      A-->>C: 200 { rate }
+    else Cache miss
+      R-->>A: (nil)
+      A->>L: Acquire per-key lock (TTL ~30s)
+      alt Lock acquired
+        A->>U: fetch_rate(period, hotel, room)
+        U-->>A: rate
+        A->>R: SET key = rate (TTL 300s)
+        A->>R: SADD rate_cache_keys key
+        A-->>C: 200 { rate }
+      else Lock not acquired (rare)
+        A-->>C: 503 Service Unavailable
+      end
+    end
+    end
+
+    rect rgb(235,245,255)
+    note over A,R,U: Background Worker (every 2 minutes)
+    loop every 120s
+      A->>R: SMEMBERS rate_cache_keys
+      alt No cached keys
+        R-->>A: ∅ (do nothing)
+      else Has cached keys
+        A->>U: fetch_rates([period,hotel,room]...)
+        U-->>A: rates_dict
+        A->>R: SET each key = rate (TTL 300s)
+      end
+    end
+    end
+```
