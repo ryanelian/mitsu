@@ -1,17 +1,16 @@
 class HealthzController < ApplicationController
     def index
-        redis_ok = false
-        begin
-            redis_ok = RedisRepository.instance.ping() == "PONG"
-        rescue => e
-            puts "Error pinging Redis: #{e}"
-            redis_ok = false
-        end
-
         render json: {
             status: "ok",
             redis: {
-                ok: redis_ok
+                ok: RedisRepository.instance.ping()
+            },
+            metrics: {
+                quota: AppSettings.rate_api_quota,
+                rate_api_calls_used: RateApiService.get_api_call_count,
+                rate_api_calls_remaining: RateApiService.remaining_quota,
+                has_quota_remaining: RateApiService.has_quota_remaining?,
+                hit_count: RateApiService.get_hit_count
             }
         }
     end
