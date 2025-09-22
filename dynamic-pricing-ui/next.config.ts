@@ -18,6 +18,12 @@ const nextConfig: NextConfig = {
 		// This ensures Turbopack can find all source files and dependencies
 		root: process.cwd(),
 	},
+	/**
+	 * Output configuration for Next.js application
+	 * This ensures the application can be run as a standalone executable
+	 * It helps with deployment and compatibility across different environments
+	 */
+	output: "standalone",
 };
 
 /**
