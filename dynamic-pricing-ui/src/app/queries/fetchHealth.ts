@@ -1,5 +1,5 @@
 import { parseErrorResponse } from "../lib/errors";
-import { getDynamicPricingProxyApiUrl } from "../lib/getDynamicPricingProxyApiUrl";
+import { getDynamicPricingProxyApiUrl } from "./getDynamicPricingProxyApiUrl";
 
 /**
  * Interface representing the structure of health check data returned from the API

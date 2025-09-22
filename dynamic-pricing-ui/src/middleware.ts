@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { env } from "./env";
 
 /**
  * Next.js middleware function that handles API route proxying to the Rails backend
@@ -16,11 +17,10 @@ export function middleware(request: NextRequest) {
 	// Check if the request is for dynamic pricing API routes
 	// These routes need to be proxied to the Rails backend server
 	if (url.pathname.startsWith("/api/dynamic-pricing/")) {
-		// Rewrite the URL to point to the Rails backend API
-		// Changes from Next.js API route to direct Rails server communication
-		url.protocol = "http";
-		url.host = "localhost:3000";
-		url.port = "3000";
+		const origin = new URL(env.secret.API_URL);
+		url.hostname = origin.hostname;
+		url.port = origin.port;
+		url.protocol = origin.protocol;
 
 		// Remove the Next.js API prefix to get the actual Rails endpoint
 		// Converts /api/dynamic-pricing/pricing to /pricing for Rails routing

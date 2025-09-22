@@ -2,7 +2,7 @@ import type { Hotel } from "../const/HOTELS";
 import type { Period } from "../const/PERIODS";
 import type { Room } from "../const/ROOMS";
 import { parseErrorResponse } from "../lib/errors";
-import { getDynamicPricingProxyApiUrl } from "../lib/getDynamicPricingProxyApiUrl";
+import { getDynamicPricingProxyApiUrl } from "./getDynamicPricingProxyApiUrl";
 import { getQueryClient } from "./getQueryClient";
 import { healthQueryOptions } from "./healthQueryOptions";
 
