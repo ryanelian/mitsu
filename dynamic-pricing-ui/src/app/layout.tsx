@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ClientRuntimeEnv } from "../env/ClientRuntimeEnv";
 import { ClientProviders } from "./ClientProvider";
 
 /**
@@ -48,11 +49,12 @@ interface RootLayoutProps {
  * @param props - Object containing child components to be rendered
  * @returns JSX element representing the complete HTML document structure
  */
-export default function RootLayout({
-	children,
-}: Readonly<RootLayoutProps>) {
+export default function RootLayout({ children }: Readonly<RootLayoutProps>) {
 	return (
 		<html lang="en">
+			<head>
+				<ClientRuntimeEnv />
+			</head>
 			<body
 				className={`${geistSans.variable} ${geistMono.variable} antialiased`}
 			>
@@ -61,3 +63,8 @@ export default function RootLayout({
 		</html>
 	);
 }
+
+/**
+ * Make all pages server-side rendered.
+ */
+export const dynamic = "force-dynamic";

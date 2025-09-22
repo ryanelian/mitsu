@@ -1,3 +1,5 @@
+import { env } from "~/env";
+
 /**
  * Generates the appropriate API URL for the dynamic pricing service
  * This function handles the difference between server-side rendering and client-side execution:
@@ -11,7 +13,10 @@ export function getDynamicPricingProxyApiUrl(path: string) {
 	// This bypasses Next.js routing to connect directly to the Rails backend
 	// Prevents routing conflicts during server-side data fetching
 	if (typeof window === "undefined") {
-		return `http://localhost:3000${path}`;
+		// Ensure that there's only one slash between the URL and the path
+		const url = env.secret.API_URL.replace(/\/$/, "");
+		const normalizedPath = path.replace(/^\//, "");
+		return `${url}/${normalizedPath}`;
 	}
 
 	// Client-side: use Next.js API route proxy
