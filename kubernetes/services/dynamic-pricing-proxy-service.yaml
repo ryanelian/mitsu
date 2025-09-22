@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dynamic-pricing-proxy-service
+  namespace: dynamic-pricing
+  labels:
+    app: dynamic-pricing-proxy
+    component: api
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: dynamic-pricing-proxy

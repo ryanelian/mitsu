@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-service
+  namespace: dynamic-pricing
+  labels:
+    app: worker-service
+    component: background-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker-service
+  template:
+    metadata:
+      labels:
+        app: worker-service
+        component: background-worker
+    spec:
+      containers:
+      - name: worker-service
+        image: ghcr.io/ryanelian/mitsu/dynamic-pricing-proxy:latest
+        envFrom:
+        - secretRef:
+            name: dynamic-pricing-proxy-secret
+        command: ["bundle", "exec", "rake", "worker_service:run"]
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redisinsight-service
+  namespace: dynamic-pricing
+  labels:
+    app: redisinsight
+    component: monitoring
+spec:
+  type: NodePort
+  ports:
+  - port: 5540
+    targetPort: 5540
+    nodePort: 30701
+    protocol: TCP
+    name: http
+  selector:
+    app: redisinsight
