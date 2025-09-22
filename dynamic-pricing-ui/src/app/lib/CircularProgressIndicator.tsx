@@ -78,7 +78,10 @@ export function CircularProgressIndicator({
 	// strokeDasharray defines the total length of the dashed stroke
 	// strokeDashoffset controls how much of the dash is visible (progress animation)
 
-	const strokeDashoffset = useMemo(() => circumference * ((100 - progress) / 100), [circumference, progress]);
+	const strokeDashoffset = useMemo(
+		() => circumference * ((100 - progress) / 100),
+		[circumference, progress],
+	);
 
 	return (
 		<div
