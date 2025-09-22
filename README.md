@@ -350,8 +350,6 @@ This will deploy:
 
 ### Load Balancing Demonstration
 
-[![Load Balancing Demonstration](https://img.youtube.com/vi/69VZqcftfu0/maxresdefault.jpg)](https://youtu.be/69VZqcftfu0)
-
 The deployment demonstrates effective load balancing across multiple replicas. Here's an example of the running pods:
 
 ```bash
@@ -375,6 +373,10 @@ redisinsight-5c687b8486-vs4wk           1/1     Running   0          2m30s
 valkey-849d94c989-qvsl5                 1/1     Running   0          2m30s
 worker-service-67c4bdd8bf-grllp         1/1     Running   0          2m29s
 ```
+
+#### YouTube Video:
+
+[![Load Balancing Demonstration](https://img.youtube.com/vi/69VZqcftfu0/maxresdefault.jpg)](https://youtu.be/69VZqcftfu0)
 
 ### Horizontal Scaling
 
