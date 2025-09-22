@@ -133,7 +133,9 @@ export function HealthMetrics() {
 								</div>
 								<div className="text-center">
 									<div className="text-2xl font-bold text-purple-600">
-										{Number(healthData.metrics.hit_count).toLocaleString()}
+										{Number(
+											healthData.metrics.hit_count,
+										).toLocaleString()}
 									</div>
 									<div className="text-sm text-gray-500">
 										Hit Count
