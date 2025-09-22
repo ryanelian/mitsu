@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamic-pricing-proxy
+  namespace: dynamic-pricing
+  labels:
+    app: dynamic-pricing-proxy
+    component: api
+spec:
+  replicas: 8
+  selector:
+    matchLabels:
+      app: dynamic-pricing-proxy
+  template:
+    metadata:
+      labels:
+        app: dynamic-pricing-proxy
+        component: api
+    spec:
+      containers:
+      - name: dynamic-pricing-proxy
+        image: ghcr.io/ryanelian/mitsu/dynamic-pricing-proxy:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        envFrom:
+        - secretRef:
+            name: dynamic-pricing-proxy-secret
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 30

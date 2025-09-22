@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rate-api
+  namespace: dynamic-pricing
+  labels:
+    app: rate-api
+    component: external-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rate-api
+  template:
+    metadata:
+      labels:
+        app: rate-api
+        component: external-api
+    spec:
+      containers:
+      - name: rate-api
+        image: tripladev/rate-api:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+

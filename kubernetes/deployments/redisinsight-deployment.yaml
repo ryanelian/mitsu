@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redisinsight
+  namespace: dynamic-pricing
+  labels:
+    app: redisinsight
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redisinsight
+  template:
+    metadata:
+      labels:
+        app: redisinsight
+        component: monitoring
+    spec:
+      containers:
+      - name: redisinsight
+        image: redis/redisinsight:latest
+        ports:
+        - containerPort: 5540
+          name: http
+        env:
+        - name: RI_REDIS_HOST
+          value: "valkey-service"
+        - name: RI_REDIS_PORT
+          value: "6379"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5540
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5540
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 30
+        volumeMounts:
+        - name: redisinsight-data
+          mountPath: /data
+      volumes:
+      - name: redisinsight-data
+        emptyDir: {}

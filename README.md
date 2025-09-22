@@ -280,27 +280,186 @@ export SENTRY_DSN="https://your-dsn@sentry.io/project-id"
 
 If no `SENTRY_DSN` is provided, the application will continue to run normally without Sentry (it will only log a warning message).
 
-## Docker Image
+## Docker Images
 
 ### Automated Image Publishing
 
-A Docker image of the Dynamic Pricing Proxy is automatically built and published to GitHub Packages whenever changes are pushed to the `main` branch:
+Docker images are automatically built and published to GitHub Packages whenever changes are pushed to the `main` branch:
 
-- **Image Repository**: `ghcr.io/{owner}/mitsu/dynamic-pricing-proxy`
-- **Trigger**: Push to `main` branch (only when `dynamic-pricing/` files change)
-- **Tags**: Multiple tags are created including:
-  - `latest` (current main branch)
-  - `main` (branch name)
-  - `main-{sha}` (commit SHA with branch prefix)
-
-### Using the Published Image
-
-To pull and run the latest published image:
-
+#### API Service
 ```bash
-# Pull the latest image
+# Pull the latest API image
 docker pull ghcr.io/ryanelian/mitsu/dynamic-pricing-proxy:latest
 
-# Run the container
+# Run the API container
 docker run -p 3000:3000 ghcr.io/ryanelian/mitsu/dynamic-pricing-proxy:latest
+```
+
+#### UI Service
+```bash
+# Pull the latest UI image
+docker pull ghcr.io/ryanelian/mitsu/dynamic-pricing-ui:latest
+
+# Run the UI container
+docker run -p 3001:3000 ghcr.io/ryanelian/mitsu/dynamic-pricing-ui:latest
+```
+
+## Kubernetes Deployment
+
+The application can be deployed to Kubernetes using the provided configuration files in the `kubernetes/` directory. This setup demonstrates horizontal scaling and load balancing across multiple replicas.
+
+### Prerequisites
+
+- Kubernetes cluster (tested with colima)
+- kubectl configured to access your cluster
+
+> **💡 Recommendation for Mac Users:**
+>
+> I recommend using [Colima](https://github.com/abiosoft/colima) - it's free and comes with [k3s](https://k3s.io/), a CNCF-certified, production-grade, lightweight Kubernetes distribution.
+>
+> Colima automatically binds LoadBalancer and NodePort services to your host machine, making local development seamless.
+>
+> Install and start Colima with Kubernetes:
+> ```bash
+> # Start Colima with Kubernetes (8 CPU, 16GB RAM recommended for this demo)
+> colima start --cpu 8 --memory 16 --kubernetes
+> ```
+>
+> ⚠️ **Resource Requirements Warning:**
+>
+> The Kubernetes deployment in this project is configured with **8 replicas** of the Dynamic Pricing Proxy for load balancing demonstration. This setup requires significant system resources:
+>
+> - **Minimum**: 8 CPU cores, 16GB RAM (as configured for Colima above)
+> - **Recommended Machine**: 12+ CPU cores, 48+ GB RAM Macbook Pro for stable operation
+>
+> If your machine doesn't have enough resources, the pods may enter crash loops due to out-of-memory (OOM) errors or CPU starvation. Consider scaling down replicas before deployment.
+
+### Deploy to Kubernetes
+
+```bash
+kubectk apply -k ./kubernetes
+```
+
+This will deploy:
+- **Dynamic Pricing Proxy** (Rails API) - 8 replicas with load balancing
+- **Dynamic Pricing UI** (Next.js Server) - 2 replicas with load balancing
+- **Rate API** - External pricing model service
+- **Valkey** Redis-compatible cache
+- **RedisInsight** - Web-based Redis admin interface
+- **Worker Service** - Background job processor
+
+### Load Balancing Demonstration
+
+The deployment demonstrates effective load balancing across multiple replicas. Here's an example of the running pods:
+
+```bash
+kubectl get pods -n dynamic-pricing
+```
+
+```log
+NAME                                    READY   STATUS    RESTARTS   AGE
+dynamic-pricing-proxy-cc6bd8c8b-72lxt   1/1     Running   0          2m30s
+dynamic-pricing-proxy-cc6bd8c8b-76vqw   1/1     Running   0          2m30s
+dynamic-pricing-proxy-cc6bd8c8b-7jfsp   1/1     Running   0          2m30s
+dynamic-pricing-proxy-cc6bd8c8b-g9plq   1/1     Running   0          2m30s
+dynamic-pricing-proxy-cc6bd8c8b-gk78m   1/1     Running   0          2m30s
+dynamic-pricing-proxy-cc6bd8c8b-glqhc   1/1     Running   0          2m30s
+dynamic-pricing-proxy-cc6bd8c8b-l5q92   1/1     Running   0          2m30s
+dynamic-pricing-proxy-cc6bd8c8b-wl57z   1/1     Running   0          2m30s
+dynamic-pricing-ui-6b5d9bcb4f-ls82j     1/1     Running   0          2m30s
+dynamic-pricing-ui-6b5d9bcb4f-x2td2     1/1     Running   0          2m30s
+rate-api-6f5bd699c-gcl79                1/1     Running   0          2m30s
+redisinsight-5c687b8486-vs4wk           1/1     Running   0          2m30s
+valkey-849d94c989-qvsl5                 1/1     Running   0          2m30s
+worker-service-67c4bdd8bf-grllp         1/1     Running   0          2m29s
+```
+
+### Horizontal Scaling
+
+The beauty of Kubernetes is its ability to scale applications horizontally by adjusting the number of replicas for any deployment:
+
+**Scale UP (to handle more load):**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamic-pricing-proxy
+  namespace: dynamic-pricing
+spec:
+  replicas: 100  # Increase from 8 to 100
+```
+
+By simply changing the `replicas` value in the deployment configuration (currently set to 8 for the proxy), Kubernetes will automatically create or destroy pods to match your desired scale.
+
+This allows the application to handle traffic from dozens to millions of users without any code changes.
+
+> **💡 Pro Tip:** With managed Kubernetes services like AWS EKS, you can enable Auto-Scaling (such as with Karpenter) that will automatically provision additional nodes when your cluster needs more capacity. This makes horizontal scaling truly "set it and forget it" - the system will scale both pods and infrastructure as needed.
+
+### Vertical Scaling
+
+You can also scale vertically by adjusting the resource requests and limits in the deployment configuration:
+
+**Scale UP (more resources):**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamic-pricing-proxy
+  namespace: dynamic-pricing
+spec:
+  template:
+    spec:
+      containers:
+      - name: dynamic-pricing-proxy
+        resources:
+          requests:
+            memory: "1Gi"  # Up from 256Mi
+            cpu: "1000m"   # Up from 100m
+          limits:
+            memory: "4Gi"  # Up from 512Mi
+            cpu: "4000m"   # Up from 500m
+```
+
+The current deployment configuration sets:
+- **Requests**: 256Mi memory, 100m CPU
+- **Limits**: 512Mi memory, 500m CPU
+
+Adjusting these values allows you to optimize resource utilization based on your actual workload patterns and available infrastructure.
+
+> **📝 CPU Units Explained:**
+> - **100m** = 0.1 CPU cores = **10%** of one CPU core
+> - **500m** = 0.5 CPU cores = **50%** of one CPU core
+> - **1000m** = 1 CPU core = **100%** of one CPU core
+> - **2000m** = 2 CPU cores = **200%** (across multiple cores)
+
+### Access the Application
+
+The Kubernetes deployment follows a typical microservices architecture where backend APIs are intentionally hidden behind an API Gateway.
+
+In this case, the **Next.js frontend serves as the API Gateway**, providing a unified entry point while keeping the backend services secure and internal.
+
+#### Backend API Access
+
+The Dynamic Pricing Proxy Rails API is **not directly exposed** to the outside world. Instead, you access it through the Next.js API Gateway:
+
+- **API Gateway URL**: `http://localhost:30702/api/dynamic-pricing/`
+- **Pricing Endpoint**: `http://localhost:30702/api/dynamic-pricing/pricing?period=Summer&hotel=FloatingPointResort&room=SingletonRoom`
+
+The API Gateway removes the need for CORS, handles authentication if needed, and manages request routing to the internal Rails API service.
+
+#### Exposed Services
+
+Only the frontend UI and monitoring tools are exposed externally:
+
+| Service         | Kubernetes Service       | NodePort | Container Port | Description |
+|-----------------|--------------------------|----------|----------------|-------------|
+| Frontend UI     | `dynamic-pricing-ui-service` | 30702    | 3000           | Next.js application with API Gateway |
+| RedisInsight    | `redisinsight-service`   | 30701    | 5540           | Web-based Redis admin interface |
+
+### Cleanup
+
+Remove all deployed resources:
+
+```bash
+kubectl delete -k ./kubernetes/
 ```

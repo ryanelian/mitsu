@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: dynamic-pricing
+
+# Include all resources
+resources:
+  - namespace.yaml
+  - dynamic-pricing-proxy-secret.yaml
+  - deployments/rate-api-deployment.yaml
+  - deployments/valkey-deployment.yaml
+  - deployments/dynamic-pricing-proxy-deployment.yaml
+  - deployments/worker-service-deployment.yaml
+  - deployments/dynamic-pricing-ui-deployment.yaml
+  - deployments/redisinsight-deployment.yaml
+  - services/rate-api-service.yaml
+  - services/valkey-service.yaml
+  - services/dynamic-pricing-proxy-service.yaml
+  - services/dynamic-pricing-ui-service.yaml
+  - services/redisinsight-service.yaml
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/name: dynamic-pricing

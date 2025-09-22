@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamic-pricing-ui
+  namespace: dynamic-pricing
+  labels:
+    app: dynamic-pricing-ui
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dynamic-pricing-ui
+  template:
+    metadata:
+      labels:
+        app: dynamic-pricing-ui
+        component: frontend
+    spec:
+      containers:
+      - name: dynamic-pricing-ui
+        image: ghcr.io/ryanelian/mitsu/dynamic-pricing-ui:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: API_URL
+          value: "http://dynamic-pricing-proxy-service:3000"
+        - name: NODE_ENV
+          value: "production"
+        - name: NEXT_TELEMETRY_DISABLED
+          value: "1"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 30
