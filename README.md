@@ -350,6 +350,8 @@ This will deploy:
 
 ### Load Balancing Demonstration
 
+![Load Balancing Demonstration](img/distributed-dynamic-pricing.mp4)
+
 The deployment demonstrates effective load balancing across multiple replicas. Here's an example of the running pods:
 
 ```bash
