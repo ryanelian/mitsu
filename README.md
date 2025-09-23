@@ -203,14 +203,25 @@ The project includes a modern Next.js React-based frontend application (`dynamic
 
 ### Running the Frontend
 
-To start the frontend development server:
+First, set up the environment configuration:
+
+```bash
+cd dynamic-pricing-ui
+cp .env.example .env
+```
+
+Edit the `.env` file and configure the required variables:
+```bash
+API_URL=http://localhost:3000
+```
+
+Then start the frontend development server:
 
 ```bash
 brew install fnm
 fnm install
 fnm use
 npm install -g pnpm
-cd dynamic-pricing-ui
 pnpm install
 pnpm dev
 ```
@@ -286,22 +297,67 @@ If no `SENTRY_DSN` is provided, the application will continue to run normally wi
 
 Docker images are automatically built and published to GitHub Packages whenever changes are pushed to the `main` branch:
 
-#### API Service
 ```bash
-# Pull the latest API image
+# Pull the latest images
 docker pull ghcr.io/ryanelian/mitsu/dynamic-pricing-proxy:latest
-
-# Run the API container
-docker run -p 3000:3000 ghcr.io/ryanelian/mitsu/dynamic-pricing-proxy:latest
+docker pull ghcr.io/ryanelian/mitsu/dynamic-pricing-ui:latest
 ```
 
-#### UI Service
-```bash
-# Pull the latest UI image
-docker pull ghcr.io/ryanelian/mitsu/dynamic-pricing-ui:latest
+#### Running Full-Stack with Docker
 
-# Run the UI container
-docker run -p 3001:3000 ghcr.io/ryanelian/mitsu/dynamic-pricing-ui:latest
+To run the complete stack using the published images:
+
+```bash
+# Create a Docker network for service communication
+docker network create dynamic-pricing-network
+
+# Start Valkey (Redis)
+docker run -d \
+  --name valkey \
+  --network dynamic-pricing-network \
+  -p 6379:6379 \
+  valkey/valkey
+
+# Start Rate API
+docker run -d \
+  --name rate-api \
+  --network dynamic-pricing-network \
+  -p 8080:8080 \
+  tripladev/rate-api:latest
+
+# Start the Rails API
+docker run -d \
+  --name dynamic-pricing-proxy \
+  --network dynamic-pricing-network \
+  -p 3000:3000 \
+  -e RAILS_ENV=production \
+  -e REDIS_URL=redis://valkey:6379/0 \
+  -e RATE_API_URL=http://rate-api:8080 \
+  -e RATE_API_QUOTA=1000 \
+  -e RATE_API_TOKEN=04aa6f42aa03f220c2ae9a276cd68c62 \
+  -e SECRET_KEY_BASE=your_secret_key_base_here \
+  ghcr.io/ryanelian/mitsu/dynamic-pricing-proxy:latest
+
+# Start the UI
+docker run -d \
+  --name dynamic-pricing-ui \
+  --network dynamic-pricing-network \
+  -p 3001:3000 \
+  -e API_URL=http://dynamic-pricing-proxy:3000 \
+  -e NODE_ENV=production \
+  -e NEXT_TELEMETRY_DISABLED=1 \
+  ghcr.io/ryanelian/mitsu/dynamic-pricing-ui:latest
+```
+
+> **Note**: The containers communicate using Docker's internal DNS resolution within the `dynamic-pricing-network`. Service names (like `valkey`, `rate-api`) resolve to the correct container IPs automatically.
+
+#### Cleanup Docker Stack
+
+```bash
+# Stop and remove all containers
+docker stop valkey rate-api dynamic-pricing-proxy dynamic-pricing-ui
+docker rm valkey rate-api dynamic-pricing-proxy dynamic-pricing-ui
+docker network rm dynamic-pricing-network
 ```
 
 ## Kubernetes Deployment
@@ -315,7 +371,7 @@ The application can be deployed to Kubernetes using the provided configuration f
 
 > **💡 Recommendation for Mac Users:**
 >
-> I recommend using [Colima](https://github.com/abiosoft/colima) - it's free and comes with [k3s](https://k3s.io/), a CNCF-certified, production-grade, lightweight Kubernetes distribution.
+> I recommend using [Colima](https://github.com/abiosoft/colima). It's free and comes with [k3s](https://k3s.io/), a CNCF-certified, production-grade, lightweight Kubernetes distribution.
 >
 > Colima automatically binds LoadBalancer and NodePort services to your host machine, making local development seamless.
 >
@@ -397,7 +453,7 @@ By simply changing the `replicas` value in the deployment configuration (current
 
 This allows the application to handle traffic from dozens to millions of users without any code changes.
 
-> **💡 Pro Tip:** With managed Kubernetes services like AWS EKS, you can enable Auto-Scaling (such as with Karpenter) that will automatically provision additional nodes when your cluster needs more capacity. This makes horizontal scaling truly "set it and forget it" - the system will scale both pods and infrastructure as needed.
+> **💡 Pro Tip:** With managed Kubernetes services like AWS EKS, you can enable Auto Mode or Karpenter that will automatically provision additional nodes when your cluster needs more capacity. This makes horizontal scaling truly "set it and forget it". the system will scale both pods and infrastructure as needed.
 
 ### Vertical Scaling
 
@@ -455,10 +511,10 @@ The API Gateway removes the need for CORS, handles authentication if needed, and
 
 Only the frontend UI and monitoring tools are exposed externally:
 
-| Service         | Kubernetes Service       | NodePort | Container Port | Description |
-|-----------------|--------------------------|----------|----------------|-------------|
-| Frontend UI     | `dynamic-pricing-ui-service` | 30702    | 3000           | Next.js application with API Gateway |
-| RedisInsight    | `redisinsight-service`   | 30701    | 5540           | Web-based Redis admin interface |
+| Service         | Kubernetes Service       | NodePort |
+|-----------------|--------------------------|----------|
+| Frontend UI     | `dynamic-pricing-ui-service` | 30702    |
+| RedisInsight    | `redisinsight-service`   | 30701    |
 
 ### Cleanup
 
