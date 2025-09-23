@@ -246,10 +246,12 @@ The frontend application provides comprehensive testing and monitoring tools:
 - Animated circular progress indicator to next refresh time
 
 #### ⚡ **Stress Testing Suite**
-- **Comprehensive Burst Test**: 360 concurrent requests testing all parameter combinations
+- **Comprehensive Burst Test**: Concurrent fetch/await calls testing all 36 parameter combinations (browsers typically cap true concurrency at 6-8 simultaneous connections per domain)
 - **Randomized Sustained Test**: 1 million sequential requests for load testing
 - Real-time progress tracking with animated progress bars
 - Detailed performance metrics (success rates, response times, throughput)
+
+> **⚠️ Browser Limitations**: While the code uses concurrent `Promise.all()` and `fetch()` calls, browsers limit simultaneous connections per domain (typically 6-8). For **true high-concurrency load testing** with hundreds or thousands of simultaneous users, see the [K6 Load Testing](#k6-load-testing) section below.
 
 ### Backend-for-Frontend (BFF) Architecture
 
@@ -515,6 +517,70 @@ Only the frontend UI and monitoring tools are exposed externally:
 |-----------------|--------------------------|----------|
 | Frontend UI     | `dynamic-pricing-ui-service` | 30702    |
 | RedisInsight    | `redisinsight-service`   | 30701    |
+
+## K6 Load Testing
+
+Once you setup the cluster you're now in for the REAL stress test using Grafana K6.
+
+![Distributed load test with Grafana K6](img/k6.png)
+
+### Prerequisites
+
+- k6 installed locally: `brew install k6` (macOS) or download from [k6.io](https://github.com/grafana/k6/releases)
+- Kubernetes cluster running with the front-end available at `http://localhost:30702`
+
+### Running Load Tests
+
+```bash
+# Navigate to the k6 directory
+cd k6
+
+# Run the test with randomized parameters (1000 VUs for 1 minute)
+k6 run index.ts
+
+# Run with custom configuration
+k6 run --vus 1000 --duration 2m index.ts
+```
+
+### Test Configuration
+
+The test is configured with the following parameters:
+- **Endpoint**: `/api/dynamic-pricing/pricing`
+- **Parameters**: Randomized combinations of valid periods, hotels, and rooms
+- **Virtual Users**: 100 concurrent users
+- **Duration**: 1 minute
+- **Think Time**: 1-4 seconds between requests (realistic user behavior)
+  - 1-2 seconds: Users navigating quickly through the page
+  - 2-4 seconds: Normal browsing (user reading and considering options)
+
+### Performance Metrics
+
+The test collects comprehensive metrics:
+- HTTP request duration and response time distribution
+- Request success/failure rates
+- Request throughput (requests per second)
+- Response time percentiles (p90, p95, p99, etc.)
+
+### Customizing the Test
+
+You can modify the test parameters by editing the constants in `k6/index.ts`:
+
+```typescript
+const BASE_URL = 'http://your-k8s-service-url';
+const VALID_PERIODS = ['Summer', 'Autumn', 'Winter', 'Spring'];
+const VALID_HOTELS = ['FloatingPointResort', 'GitawayHotel', 'RecursionRetreat'];
+const VALID_ROOMS = ['SingletonRoom', 'BooleanTwin', 'RestfulKing'];
+```
+
+### Generating Reports
+
+```bash
+# Generate HTML dashboard
+k6 run --out web-dashboard index.ts
+
+# Generate JSON report
+k6 run --out json=results.json index.ts
+```
 
 ### Cleanup
 
